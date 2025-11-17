@@ -1,9 +1,8 @@
 import os
 import uuid
-import numpy as np
+import wave
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse
-import soundfile as sf
 import openai
 
 app = FastAPI()
@@ -19,9 +18,12 @@ async def ask_audio(request: Request):
     temp_in = f"input_{uuid.uuid4()}.wav"
     temp_out = f"output_{uuid.uuid4()}.wav"
 
-    # Chuyển mảng byte -> int16 -> ghi ra file WAV
-    data = np.frombuffer(raw, dtype="int16")
-    sf.write(temp_in, data, SAMPLE_RATE, subtype="PCM_16")
+    # Ghi trực tiếp raw PCM thành file WAV (không cần numpy/soundfile)
+    with wave.open(temp_in, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)  # 16-bit
+        wf.setframerate(SAMPLE_RATE)
+        wf.writeframes(raw)
 
     # 2) STT: giọng nói -> văn bản
     transcript = openai.audio.transcriptions.create(
@@ -60,5 +62,5 @@ async def ask_audio(request: Request):
     with open(temp_out, "wb") as f:
         f.write(speech.read())
 
-    # Trả file WAV cho ESP32
+    # Trả WAV cho ESP32
     return FileResponse(temp_out, media_type="audio/wav")
